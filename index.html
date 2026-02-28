@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+                 user-scalable=no, viewport-fit=cover" />
+  <title>Lin's Sprint</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+    .pixel-art { image-rendering: pixelated; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    /* Voice mic button wrapper */
+    .mic-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+    .mic-wrap .mic-btn { position: relative; z-index: 2; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+    .mic-wrap .mic-btn:active { transform: scale(0.85); }
+    /* idle hover */
+    .mic-wrap:not(.recording) .mic-btn:hover { background: #000; color: #fff; }
+    /* recording state */
+    .mic-wrap.recording .mic-btn {
+      background: #ef4444; border-color: #ef4444; color: #fff;
+      animation: micBreath 1.6s ease-in-out infinite;
+    }
+    @keyframes micBreath {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+      50% { box-shadow: 0 0 20px 6px rgba(239,68,68,0.3); }
+    }
+    /* ripple rings */
+    .mic-ring {
+      position: absolute; inset: -4px; border-radius: 9999px;
+      border: 2px solid #ef4444; opacity: 0; pointer-events: none;
+    }
+    .mic-wrap.recording .mic-ring:nth-child(1) { animation: ringExpand 2s ease-out 0s infinite; }
+    .mic-wrap.recording .mic-ring:nth-child(2) { animation: ringExpand 2s ease-out 0.6s infinite; }
+    .mic-wrap.recording .mic-ring:nth-child(3) { animation: ringExpand 2s ease-out 1.2s infinite; }
+    @keyframes ringExpand { 0% { transform:scale(1); opacity:0.6; } 100% { transform:scale(2.2); opacity:0; } }
+    /* sound wave bars */
+    .mic-waves { display: flex; align-items: center; gap: 2px; height: 18px; position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); }
+    .mic-waves span { display: block; width: 3px; background: #ef4444; border-radius: 2px; }
+    .mic-wrap.recording .mic-waves span { animation: waveBar 0.8s ease-in-out infinite; }
+    .mic-wrap.recording .mic-waves span:nth-child(1) { animation-delay: 0s; }
+    .mic-wrap.recording .mic-waves span:nth-child(2) { animation-delay: 0.15s; }
+    .mic-wrap.recording .mic-waves span:nth-child(3) { animation-delay: 0.3s; }
+    .mic-wrap.recording .mic-waves span:nth-child(4) { animation-delay: 0.45s; }
+    .mic-wrap.recording .mic-waves span:nth-child(5) { animation-delay: 0.6s; }
+    @keyframes waveBar {
+      0%, 100% { height: 4px; opacity: 0.4; }
+      50% { height: 18px; opacity: 1; }
+    }
+    /* click flash */
+    .mic-flash { position: absolute; inset: -2px; border-radius: 9999px; background: rgba(239,68,68,0.35); opacity: 0; pointer-events: none; }
+    .mic-flash.active { animation: flashPop 0.4s ease-out forwards; }
+    @keyframes flashPop { 0% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(2); } }
+    @keyframes voiceBlink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+    .animate-in { animation: fadeIn .18s ease-out both; }
+    .fade-in { }
+    .slide-in-from-bottom-10 { animation: slideUp .2s ease-out both; }
+    .zoom-in-95 { animation: zoomIn .15s ease-out both; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: .8; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes zoomIn { from { transform: scale(.95); opacity: .8; } to { transform: scale(1); opacity: 1; } }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    import { initializeApp } from "firebase/app";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signOut
+    } from "firebase/auth";
+    import {
+      getFirestore,
+      collection,
+      doc,
+      setDoc,
+      deleteDoc,
+      onSnapshot,
+      serverTimestamp
+    } from "firebase/firestore";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQfBEUJ42TzcCIwTspfmLO1e03eRtBkEs",
+      authDomain: "l-sprint.firebaseapp.com",
+      projectId: "l-sprint",
+      storageBucket: "l-sprint.firebasestorage.app",
+      messagingSenderId: "829958663223",
+      appId: "1:829958663223:web:4b08abddae41e97ccfe3b2",
+      measurementId: "G-CXSHE0VRK8"
+    };
+
+    const SPRINT_DATA = [
+      {
+        week: 1, theme: "MECHANISM & BOUNDARIES", desc: "Understanding the atoms of LLMs.",
+        days: [
+          { id: 'w1d1', day: 'SESSION 01', type: 'THEORY', time: '2H', title: "AI Principles", desc: "Probability & Tokens.", mini_task: "Hallucination Test", guide: [{ step: "Tokenization", detail: "Read OpenAI tiktoken docs. Understand how text becomes numbers." }, { step: "Probability vs Reasoning", detail: "Watch Karpathy's Intro to LLMs (first 30 mins)." }, { step: "Boundary Test", detail: "Document 3 hallucination cases in your notes." }], materials: ["Andrej Karpathy - Intro to LLMs", "OpenAI Tokenizer"] },
+          { id: 'w1d2', day: 'SESSION 02', type: 'PRACTICE', time: '2H', title: "Vibe Coding", desc: "Controlling Chaos.", mini_task: "v0.dev Variations", guide: [{ step: "System Prompts", detail: "Practice role-playing prompts." }, { step: "Iterative Flow", detail: "Use v0.dev to iterate a UI 5 times via natural language." }], materials: ["v0.dev Docs", "Claude Prompt Gallery"] },
+          { id: 'w1d3', day: 'SESSION 03', type: 'THEORY', time: '2H', title: "Trust Design", desc: "UX for Errors.", mini_task: "Disclaimer Gallery", guide: [{ step: "Error Tolerance", detail: "Research how to show uncertainty in UI." }, { step: "Transparency", detail: "Design a 'Thinking Process' indicator." }], materials: ["Apple HIG for AI"] },
+          { id: 'w1d4', day: 'WEEKEND', type: 'DEEP BUILD', time: '4H', title: "Honest Component", desc: "Regenerate UI.", mini_task: "Component Demo", guide: [{ step: "Regenerate Button", detail: "Build a React component with built-in regen loop." }] }
+        ]
+      },
+      {
+        week: 2, theme: "CONTEXT & MEMORY", desc: "RAG and Intelligent Agents.",
+        days: [
+          { id: 'w2d1', day: 'SESSION 01', type: 'THEORY', time: '2H', title: "Context Window", desc: "RAG Logic.", mini_task: "RAG Storyboard", guide: [{ step: "RAG Basics", detail: "Understand Retrieval vs Generation separation." }], materials: ["LangChain RAG Guide"] },
+          { id: 'w2d2', day: 'SESSION 02', type: 'PRACTICE', time: '2H', title: "Agent Patterns", desc: "Chain of Thought.", mini_task: "Prompt Breakdown", guide: [{ step: "ReAct Pattern", detail: "Learn Reason + Act loops." }] },
+          { id: 'w2d3', day: 'SESSION 03', type: 'THEORY', time: '2H', title: "Streaming UX", desc: "Perceived Latency.", mini_task: "Loading Screen", guide: [{ step: "Streaming", detail: "Why typewriter effects reduce anxiety." }] },
+          { id: 'w2d4', day: 'WEEKEND', type: 'DEEP BUILD', time: '4H', title: "Persistence", desc: "LocalStorage.", mini_task: "Todo App", guide: [{ step: "Local State", detail: "Save chat history to LocalStorage." }] }
+        ]
+      },
+      {
+        week: 3, theme: "BEYOND TEXT", desc: "Multimodal Interactions.",
+        days: [
+          { id: 'w3d1', day: 'SESSION 01', type: 'THEORY', time: '2H', title: "Vision & Voice", desc: "New Inputs.", mini_task: "Voice UI Flow", guide: [{ step: "Vision Analysis", detail: "Study GPT-4o image understanding." }] },
+          { id: 'w3d2', day: 'SESSION 02', type: 'PRACTICE', time: '2H', title: "Persona", desc: "System Prompts.", mini_task: "Persona Test", guide: [{ step: "Character Design", detail: "Define tone and constraints." }] },
+          { id: 'w3d3', day: 'SESSION 03', type: 'THEORY', time: '2H', title: "Invisible UI", desc: "Anticipatory Design.", mini_task: "Concept Art", guide: [{ step: "Intent Prediction", detail: "Predict needs before user clicks." }] },
+          { id: 'w3d4', day: 'WEEKEND', type: 'DEEP BUILD', time: '4H', title: "Smart Lens", desc: "Camera Input.", mini_task: "Vision Demo" }
+        ]
+      },
+      {
+        week: 4, theme: "SHIP IT", desc: "Evaluation & Portfolio.",
+        days: [
+          { id: 'w4d1', day: 'SESSION 01', type: 'THEORY', time: '2H', title: "Evals", desc: "Metrics.", mini_task: "Success Metrics", guide: [{ step: "LLM-as-a-judge", detail: "Automated quality scoring." }] },
+          { id: 'w4d2', day: 'SESSION 02', type: 'PRACTICE', time: '2H', title: "Case Study", desc: "Storytelling.", mini_task: "Case Outline", guide: [{ step: "Documentation", detail: "Write up your Deep Build journey." }] },
+          { id: 'w4d3', day: 'SESSION 03', type: 'THEORY', time: '2H', title: "Next Steps", desc: "Staying Current.", mini_task: "News Feed", guide: [{ step: "Sources", detail: "Curate your AI news sources." }] },
+          { id: 'w4d4', day: 'WEEKEND', type: 'DEEP BUILD', time: '4H', title: "Portfolio", desc: "Final Build.", mini_task: "Personal Site" }
+        ]
+      }
+    ];
+
+    const ICON_PATHS = {
+      X: `<path d="M18 6 6 18M6 6l12 12" />`,
+      Plus: `<path d="M5 12h14M12 5v14" />`,
+      Trash2: `<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />`,
+      Zap: `<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />`,
+      Save: `<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" />`,
+      Play: `<path d="M5 3l14 9-14 9V3z" />`,
+      Pause: `<path d="M6 4h4v16H6zm8 0h4v16h-4z" />`,
+      LogOut: `<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />`,
+      Mic: `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />`,
+      MicOff: `<line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" /><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.35 2.17" /><path d="M12 19v4M8 23h8" />`,
+      AlertCircle: `<circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />`,
+      ChevronRight: `<path d="m9 18 6-6-6-6" />`,
+      Brain: `<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" /><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />`,
+      Code: `<path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />`,
+      Coffee: `<path d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" /><path d="M6 1v3M10 1v3M14 1v3" />`,
+      Target: `<circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />`,
+      Smartphone: `<rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" />`,
+      ExternalLink: `<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />`
+    };
+
+    function Icon(name, size = 24, className = "") {
+      const content = ICON_PATHS[name];
+      if (!content) return "";
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}">${content}</svg>`;
+    }
+
+    const ZHIPU_API_KEY = "d7c1b9509e8e48bc8343497dfdff6f53.sZsuJQMLKDUNbJFo";
+
+    function MailboxIcon(size = 40) {
+      return `
+        <svg viewBox="0 0 32 32" width="${size}" height="${size}" class="pixel-art" style="image-rendering:pixelated">
+          <rect x="4" y="12" width="24" height="14" rx="0" fill="#000" stroke="#000" stroke-width="1"/>
+          <rect x="6" y="14" width="10" height="10" fill="#000"/>
+          <rect x="16" y="14" width="10" height="10" fill="#000"/>
+          <rect x="7" y="17" width="4" height="2" fill="#000"/>
+          <rect x="19" y="20" width="3" height="2" fill="#000"/>
+          <rect x="20" y="8" width="2" height="12" fill="#CC3333"/>
+          <rect x="20" y="6" width="6" height="4" fill="#CC3333"/>
+          <rect x="10" y="26" width="12" height="4" fill="#000"/>
+          <rect x="12" y="30" width="8" height="2" fill="#000"/>
+        </svg>
+      `;
+    }
+
+    function CatIcon(value) {
+      const Loaf = () => `<svg viewBox="0 0 32 32" fill="currentColor" class="w-full h-full text-black"><rect x="6" y="16" width="20" height="10" /><rect x="8" y="12" width="4" height="4" /><rect x="20" y="12" width="4" height="4" /><rect x="11" y="16" width="2" height="2" fill="white" /><rect x="19" y="16" width="2" height="2" fill="white" /></svg>`;
+      const Sit = () => `<svg viewBox="0 0 32 32" fill="currentColor" class="w-full h-full text-black"><rect x="8" y="14" width="14" height="12" /><rect x="8" y="10" width="14" height="4" /><rect x="8" y="6" width="4" height="4" /><rect x="18" y="6" width="4" height="4" /><rect x="11" y="16" width="2" height="2" fill="white" /><rect x="17" y="16" width="2" height="2" fill="white" /></svg>`;
+      const Walk = () => `<svg viewBox="0 0 32 32" fill="currentColor" class="w-full h-full text-black"><rect x="10" y="12" width="12" height="12" /><rect x="14" y="8" width="10" height="4" /><rect x="16" y="4" width="2" height="4" /><rect x="22" y="4" width="2" height="4" /><rect x="6" y="4" width="4" height="12" /><rect x="17" y="12" width="2" height="3" fill="white" /><rect x="21" y="12" width="2" height="3" fill="white" /></svg>`;
+      if (value === 1) return Loaf();
+      if (value === 2) return Sit();
+      return Walk();
+    }
+
+    const root = document.getElementById("root");
+    const appId = "lin-sprint-default";
+
+    const state = {
+      user: null,
+      db: null,
+      auth: null,
+      firebaseEnabled: false,
+      loginEmail: "",
+      loginPassword: "",
+      currentView: "sprint",
+      notes: [],
+      completedTasks: new Set(),
+      selectedTask: null,
+      noteText: "",
+      noteImages: [],
+      layoutColumns: 2,
+      newsData: [],
+      newsLoading: false,
+      isListening: false,
+      recognition: null,
+      hoveredImages: null,
+      toast: null,
+      activeImageId: null,
+      dragState: null,
+      timerSeconds: 0,
+      timerActive: false,
+      timerInterval: null,
+      savedScrollY: 0,
+      modalClosing: false,
+      mailboxOpen: false,
+      mailboxPrompt: "",
+      mailboxLoading: false,
+      mailboxResult: "",
+      mailboxResultPrompt: ""
+    };
+
+    const neko = { isDragging: false, dragProgress: (state.layoutColumns - 1) / 2 };
+
+    function showToast(text) {
+      const id = "lin-sprint-toast";
+      const existing = document.getElementById(id);
+      if (existing) existing.remove();
+      clearTimeout(showToast._t);
+      const el = document.createElement("div");
+      el.id = id;
+      el.className = "fixed top-20 left-1/2 -translate-x-1/2 z-[1100] bg-black text-white px-6 py-2 font-bold shadow-lg";
+      el.textContent = text;
+      document.body.appendChild(el);
+      showToast._t = setTimeout(() => { el.remove(); }, 3000);
+    }
+
+    function storageKey() {
+      const uid = state.user && state.user.uid ? state.user.uid : "local";
+      return `lin_sprint_notes__${appId}__${uid}`;
+    }
+
+    function loadNotesFromLocal() {
+      try {
+        const raw = localStorage.getItem(storageKey());
+        const data = raw ? JSON.parse(raw) : [];
+        state.notes = Array.isArray(data) ? data : [];
+      } catch { state.notes = []; }
+      state.completedTasks = new Set(state.notes.filter(n => n.taskId && !n.isCustom).map(n => n.taskId));
+    }
+
+    function saveNotesToLocal() {
+      localStorage.setItem(storageKey(), JSON.stringify(state.notes));
+      state.completedTasks = new Set(state.notes.filter(n => n.taskId && !n.isCustom).map(n => n.taskId));
+    }
+
+    let firestoreUnsub = null;
+
+    function attachFirestoreListener() {
+      if (firestoreUnsub) { try { firestoreUnsub(); } catch {} firestoreUnsub = null; }
+      if (!state.firebaseEnabled || !state.user || !state.db) return;
+      const notesRef = collection(state.db, "artifacts", appId, "users", state.user.uid, "notes");
+      firestoreUnsub = onSnapshot(notesRef, (snapshot) => {
+        const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.notes = data.map(n => ({
+          id: n.id,
+          title: n.title || "",
+          text: n.text || "",
+          images: Array.isArray(n.images) ? n.images : [],
+          taskId: n.taskId || null,
+          isCustom: !!n.isCustom,
+          day: n.day || "",
+          updatedAt: n.updatedAt || null
+        }));
+        state.completedTasks = new Set(state.notes.filter(n => n.taskId && !n.isCustom).map(n => n.taskId));
+        render();
+      }, (err) => console.error("Firestore Error:", err));
+    }
+
+    async function initFirebase() {
+      try {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const firestore = getFirestore(app);
+        state.db = firestore;
+        state.auth = auth;
+        state.firebaseEnabled = true;
+        onAuthStateChanged(auth, (u) => {
+          const prevUser = state.user;
+          state.user = u || null;
+          if (state.user && !state.firebaseEnabled) loadNotesFromLocal();
+          attachFirestoreListener();
+          if (prevUser !== state.user) render();
+        });
+      } catch (e) {
+        console.error("Firebase Init Error", e);
+        state.firebaseEnabled = false;
+        state.user = { uid: "local-offline" };
+        loadNotesFromLocal();
+        render();
+      }
+    }
+
+    async function loginWithEmailPassword(email, password) {
+      if (!state.firebaseEnabled || !state.auth) {
+        state.user = { uid: "local-offline" };
+        loadNotesFromLocal();
+        showToast("Offline (local only)");
+        render();
+        return;
+      }
+      try {
+        await signInWithEmailAndPassword(state.auth, email, password);
+        showToast("Logged in");
+      } catch (e) {
+        if (e.code === "auth/user-not-found") {
+          try {
+            await createUserWithEmailAndPassword(state.auth, email, password);
+            showToast("Account created");
+          } catch (e2) {
+            console.error(e2);
+            state.user = { uid: "local-offline" };
+            loadNotesFromLocal();
+            showToast("Local mode only");
+            render();
+          }
+        } else if (e.code === "auth/invalid-credential" || e.code === "auth/too-many-requests") {
+          console.warn(e);
+          state.user = { uid: "local-offline" };
+          loadNotesFromLocal();
+          showToast("Local mode (no cloud)");
+          render();
+        } else {
+          console.error(e);
+          showToast("Login failed");
+        }
+      }
+    }
+
+    async function doLogout() {
+      try { if (state.firebaseEnabled && state.auth) await signOut(state.auth); } catch (e) { console.error(e); }
+      localStorage.clear();
+      location.reload();
+    }
+
+    function getDocIdForSelectedTask() {
+      const t = state.selectedTask;
+      return t ? (t.taskId || t.id || `custom_${Date.now()}`) : null;
+    }
+
+    async function saveNote() {
+      if (!state.selectedTask) return;
+      const t = state.selectedTask;
+      const docId = getDocIdForSelectedTask();
+      const payload = {
+        text: state.noteText,
+        images: state.noteImages,
+        taskId: t.isCustom ? null : (t.taskId || t.id),
+        isCustom: !!t.isCustom,
+        title: t.title || "",
+        updatedAt: state.firebaseEnabled ? serverTimestamp() : Date.now(),
+        day: new Date().toLocaleDateString()
+      };
+      if (state.firebaseEnabled && state.user && state.db) {
+        try {
+          await setDoc(doc(state.db, "artifacts", appId, "users", state.user.uid, "notes", docId), payload);
+        } catch (e) {
+          console.error(e);
+          showToast("Save failed (Firestore)");
+          return;
+        }
+      } else {
+        const idx = state.notes.findIndex(n => n.id === docId);
+        const normalized = { id: docId, ...payload };
+        if (idx >= 0) state.notes.splice(idx, 1, normalized);
+        else state.notes.unshift(normalized);
+        saveNotesToLocal();
+      }
+      showToast("Saved to Archive");
+      closeTask();
+    }
+
+    async function deleteNote(id) {
+      if (state.firebaseEnabled && state.user && state.db) {
+        try {
+          await deleteDoc(doc(state.db, "artifacts", appId, "users", state.user.uid, "notes", id));
+          showToast("Deleted");
+        } catch (e) { console.error(e); showToast("Delete failed"); }
+      } else {
+        state.notes = state.notes.filter(n => n.id !== id);
+        saveNotesToLocal();
+        showToast("Deleted");
+        render();
+      }
+    }
+
+    function openTask(task) {
+      state.savedScrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${state.savedScrollY}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.overflow = "hidden";
+      const existing = state.notes.find(n => (n.taskId && n.taskId === task.id) || n.id === task.id);
+      state.selectedTask = { ...task };
+      state.noteText = existing ? (existing.text || "") : "";
+      state.noteImages = existing ? (Array.isArray(existing.images) ? existing.images : []) : [];
+      stopVoice();
+      stopTimer();
+      state.timerSeconds = 0;
+      state.timerActive = false;
+      render();
+    }
+
+    function unlockBodyScroll() {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      document.body.style.overflow = "";
+      window.scrollTo(0, state.savedScrollY);
+    }
+
+    function closeTask() {
+      stopVoice();
+      stopTimer();
+      state.modalClosing = true;
+      const modal = root.querySelector("[data-task-modal='1']");
+      if (modal) {
+        modal.style.opacity = "0";
+        setTimeout(() => {
+          state.selectedTask = null;
+          state.noteText = "";
+          state.noteImages = [];
+          state.activeImageId = null;
+          state.dragState = null;
+          state.modalClosing = false;
+          modal.remove();
+          unlockBodyScroll();
+          bindEvents();
+        }, 200);
+      } else {
+        state.selectedTask = null;
+        state.noteText = "";
+        state.noteImages = [];
+        state.activeImageId = null;
+        state.dragState = null;
+        state.modalClosing = false;
+        unlockBodyScroll();
+        render();
+      }
+    }
+
+    function bindOneImageEl(wrapper, img) {
+      const moveEl = wrapper.querySelector(`[data-img-move="${img.id}"]`);
+      const resizeEl = wrapper.querySelector(`[data-img-resize="${img.id}"]`);
+      const removeBtn = wrapper.querySelector(`[data-img-remove="${img.id}"]`);
+      if (moveEl) {
+        moveEl.addEventListener("mousedown", e => { startImageControl(e, img, "move"); });
+        moveEl.addEventListener("touchstart", e => { startImageControl(e, img, "move"); }, { passive: false });
+      }
+      if (resizeEl) {
+        resizeEl.addEventListener("mousedown", e => { startImageControl(e, img, "resize"); });
+        resizeEl.addEventListener("touchstart", e => { startImageControl(e, img, "resize"); }, { passive: false });
+      }
+      if (removeBtn) {
+        removeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          state.noteImages = state.noteImages.filter(i => i.id !== img.id);
+          wrapper.remove();
+        });
+      }
+    }
+
+    function handlePasteImages(e) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const img = { id: Date.now() + Math.floor(Math.random() * 1000), src: ev.target.result, x: 50, y: 50, width: 250 };
+            state.noteImages = state.noteImages.concat([img]);
+            const layer = root.querySelector("[data-note-images-layer='1']");
+            if (!layer) return;
+            const div = document.createElement("div");
+            div.innerHTML = `
+              <div data-img-id="${img.id}" class="absolute border-2 border-black bg-white group cursor-move shadow-xl pointer-events-auto" style="left:${img.x}px; top:${img.y}px; width:${img.width || 300}px;">
+                <div data-img-move="${img.id}"><img src="${img.src}" class="w-full pointer-events-none" /></div>
+                <div data-img-resize="${img.id}" class="absolute bottom-0 right-0 w-6 h-6 bg-black cursor-nwse-resize flex items-center justify-center opacity-0 group-hover:opacity-100"><div class="w-1 h-1 bg-white"></div></div>
+                <button data-img-remove="${img.id}" class="absolute -top-3 -right-3 bg-black text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-none" aria-label="remove image">${Icon("X", 12)}</button>
+              </div>
+            `;
+            const wrapper = div.firstElementChild;
+            layer.appendChild(wrapper);
+            bindOneImageEl(wrapper, img);
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+
+    function getClientPoint(e) {
+      const t = e.touches && e.touches[0];
+      return { x: typeof e.clientX === "number" ? e.clientX : (t ? t.clientX : 0), y: typeof e.clientY === "number" ? e.clientY : (t ? t.clientY : 0) };
+    }
+
+    function startImageControl(e, img, type) {
+      e.preventDefault();
+      e.stopPropagation();
+      state.activeImageId = img.id;
+      const pt = getClientPoint(e);
+      state.dragState = { type, startX: pt.x, startY: pt.y, initX: img.x, initY: img.y, initW: img.width || 300 };
+    }
+
+    function globalMove(e) {
+      if (!state.dragState || !state.activeImageId) return;
+      const pt = getClientPoint(e);
+      const dx = pt.x - state.dragState.startX;
+      const dy = pt.y - state.dragState.startY;
+      state.noteImages = state.noteImages.map(img => {
+        if (img.id !== state.activeImageId) return img;
+        if (state.dragState.type === "move") return { ...img, x: state.dragState.initX + dx, y: state.dragState.initY + dy };
+        if (state.dragState.type === "resize") return { ...img, width: Math.max(100, state.dragState.initW + dx) };
+        return img;
+      });
+      updateImagePositionsOnly();
+    }
+
+    function endGlobalDrag() {
+      if (!state.dragState && !state.activeImageId) return;
+      const layer = document.querySelector("[data-note-images-layer='1']");
+      if (layer) {
+        const activeEl = layer.querySelector(`[data-img-id="${state.activeImageId}"]`);
+        if (activeEl) activeEl.style.willChange = "";
+      }
+      state.dragState = null;
+      state.activeImageId = null;
+    }
+
+    function updateImagePositionsOnly() {
+      const layer = document.querySelector("[data-note-images-layer='1']");
+      if (!layer) return;
+      for (const img of state.noteImages) {
+        const el = layer.querySelector(`[data-img-id="${img.id}"]`);
+        if (!el) continue;
+        if (img.id === state.activeImageId) el.style.willChange = "transform";
+        el.style.left = img.x + "px";
+        el.style.top = img.y + "px";
+        el.style.width = (img.width || 300) + "px";
+      }
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+    }
+
+    function startTimer() {
+      stopTimer();
+      state.timerActive = true;
+      state.timerInterval = setInterval(() => {
+        state.timerSeconds += 1;
+        const el = document.querySelector("[data-timer-value='1']");
+        if (el) el.textContent = formatTime(state.timerSeconds);
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.timerInterval = null;
+      state.timerActive = false;
+    }
+
+    function toggleTimer() {
+      if (state.timerActive) stopTimer();
+      else startTimer();
+      render();
+    }
+
+    function stopVoice() {
+      try { if (state.recognition) state.recognition.stop(); } catch {}
+      state.recognition = null;
+      state.isListening = false;
+      state._voiceBaseText = null;
+    }
+
+    function toggleVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { showToast("Browser does not support Speech API"); return; }
+      if (state.isListening) { stopVoice(); render(); return; }
+      try {
+        const rec = new SpeechRecognition();
+        state.recognition = rec;
+        state._voiceBaseText = state.noteText || "";
+        rec.lang = "zh-CN";
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.onstart = () => { state.isListening = true; showToast("Listening..."); render(); };
+        rec.onend = () => {
+          state.isListening = false;
+          state.recognition = null;
+          state._voiceBaseText = null;
+          render();
+        };
+        rec.onerror = (e) => {
+          if (e.error === "no-speech") { showToast("No speech detected, try again"); }
+          else if (e.error === "not-allowed") { showToast("Microphone permission denied"); }
+          else { showToast(`Voice Error: ${e.error || "unknown"}`); }
+          state.isListening = false;
+          state.recognition = null;
+          state._voiceBaseText = null;
+          render();
+        };
+        rec.onresult = (e) => {
+          let finalText = "";
+          let interimText = "";
+          for (let i = 0; i < e.results.length; i++) {
+            const transcript = e.results[i][0].transcript;
+            if (e.results[i].isFinal) {
+              finalText += transcript;
+            } else {
+              interimText += transcript;
+            }
+          }
+          const combined = finalText + interimText;
+          if (!combined) return;
+          const base = state._voiceBaseText || "";
+          state.noteText = base ? (base + "\n" + combined) : combined;
+          const ta = document.querySelector("[data-note-textarea='1']");
+          if (ta) { ta.value = state.noteText; }
+        };
+        rec.start();
+      } catch (e) {
+        console.error(e);
+        state.isListening = false;
+        state.recognition = null;
+        state._voiceBaseText = null;
+        showToast("Voice start failed");
+        render();
+      }
+    }
+
+    function setLayoutColumns(val) {
+      state.layoutColumns = val;
+      localStorage.setItem("lin_sprint_layout_cols", String(val));
+      render();
+    }
+
+    function updateNekoProgressFromX(x, track) {
+      const rect = track.getBoundingClientRect();
+      const p = Math.max(0, Math.min((x - rect.left) / rect.width, 1));
+      neko.dragProgress = p;
+      const knob = document.querySelector("[data-neko-knob='1']");
+      const cat = document.querySelector("[data-neko-cat='1']");
+      if (knob) { knob.style.left = `${p * 100}%`; knob.style.transition = neko.isDragging ? "none" : "left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"; }
+      if (cat) { const v = p < 0.33 ? 1 : (p < 0.66 ? 2 : 3); cat.innerHTML = CatIcon(v); }
+    }
+
+    function endNekoDrag() {
+      if (!neko.isDragging) return;
+      neko.isDragging = false;
+      const v = neko.dragProgress < 0.33 ? 1 : (neko.dragProgress < 0.66 ? 2 : 3);
+      setLayoutColumns(v);
+    }
+
+    async function fetchNewsIfNeeded() {
+      if (state.currentView !== "signals") return;
+      if (state.newsData.length > 0 || state.newsLoading) return;
+      state.newsLoading = true;
+      render();
+      try {
+        const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent("https://techcrunch.com/category/artificial-intelligence/feed/")}`);
+        const d = await r.json();
+        state.newsData = (d.items || []).slice(0, 10);
+      } catch (e) { console.error(e); showToast("News fetch failed"); }
+      finally { state.newsLoading = false; render(); }
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    }
+
+    function clampText(text, maxChars) {
+      const t = String(text || "");
+      return t.length <= (maxChars || 240) ? t : t.slice(0, maxChars || 240) + "…";
+    }
+
+    function findTaskById(id) {
+      for (const w of SPRINT_DATA) {
+        const t = w.days.find(d => d.id === id);
+        if (t) return t;
+      }
+      return null;
+    }
+
+    function renderLogin() {
+      return `
+        <div class="min-h-screen flex items-center justify-center bg-white p-4">
+          <div class="w-full max-w-sm border-2 border-black p-8 text-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <h1 class="text-4xl font-black mb-8 tracking-tighter uppercase">Lin's Sprint</h1>
+            <input data-login-email="1" type="email" autocomplete="email" name="email" value="${escapeHtml(state.loginEmail)}" placeholder="EMAIL" class="w-full border-b border-black text-center font-bold text-sm py-2 mb-3 outline-none bg-transparent" />
+            <input data-login-password="1" type="password" autocomplete="current-password" name="password" value="${escapeHtml(state.loginPassword)}" placeholder="PASSWORD (>= 6 chars)" class="w-full border-b border-black text-center font-bold text-sm py-2 mb-6 outline-none bg-transparent" />
+            <button data-login-btn="1" class="w-full bg-black text-white py-3 font-bold uppercase tracking-widest">START</button>
+            <p class="mt-4 text-[10px] text-gray-500 uppercase">SAME EMAIL = SAME SPRINT ACROSS DEVICES</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderNav() {
+      const tabs = ["sprint", "notes", "signals"];
+      return `
+        <nav class="border-b-2 border-black sticky top-0 bg-white z-40 h-14 flex items-center justify-between px-6">
+          <div class="flex gap-8">
+            ${tabs.map(v => `<button data-nav="${v}" class="text-[10px] font-black uppercase tracking-widest ${state.currentView === v ? "opacity-100" : "opacity-30"}">${v}</button>`).join("")}
+          </div>
+          <div class="flex items-center gap-4">
+            <button data-logout="1" aria-label="logout">${Icon("LogOut", 16)}</button>
+          </div>
+        </nav>
+      `;
+    }
+
+    function renderSprintView() {
+      return `
+        <div class="animate-in fade-in">
+          <h1 class="text-[60px] md:text-[120px] font-black leading-none tracking-tighter mb-20 uppercase">Lin's Sprint</h1>
+          <div class="flex gap-6 font-mono text-[10px] font-bold uppercase text-gray-500 mb-12">
+            <span class="flex items-center gap-1">${Icon("Brain", 14)} Theory</span>
+            <span class="flex items-center gap-1">${Icon("Code", 14)} Practice</span>
+            <span class="flex items-center gap-1">${Icon("Coffee", 14)} Rest</span>
+          </div>
+          ${SPRINT_DATA.map(week => `
+            <section class="mb-24">
+              <div class="flex justify-between items-baseline border-b-2 border-black pb-2 mb-8">
+                <h2 class="text-5xl font-black uppercase">Week ${week.week}</h2>
+                <span class="font-mono text-xs opacity-40">// ${escapeHtml(week.theme)}</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 border-t-2 border-l-2 border-black bg-black gap-px overflow-hidden">
+                ${week.days.map(task => `
+                  <div data-open-task="${task.id}" class="p-8 bg-white hover:bg-black hover:text-white cursor-pointer transition-colors group">
+                    <div class="flex justify-between mb-8">
+                      <div class="border border-black px-2 py-0.5 font-mono text-[10px] font-bold uppercase group-hover:border-white">${escapeHtml(task.day)}</div>
+                      ${state.completedTasks.has(task.id) ? `<span class="animate-pulse">${Icon("Zap", 16, "fill-black group-hover:fill-white")}</span>` : ""}
+                    </div>
+                    <h3 class="text-3xl font-black mb-4 uppercase leading-tight">${escapeHtml(task.title)}</h3>
+                    <p class="text-sm opacity-60 mb-6">${escapeHtml(task.desc)}</p>
+                    <div class="pt-4 border-t border-current flex items-center gap-2 font-mono text-[10px] font-bold opacity-40 uppercase">${Icon("Target", 12)} ${escapeHtml(task.mini_task || "")}</div>
+                  </div>
+                `).join("")}
+              </div>
+            </section>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderNekoSlider() {
+      if (!neko.isDragging) neko.dragProgress = (state.layoutColumns - 1) / 2;
+      const catValue = neko.dragProgress < 0.33 ? 1 : (neko.dragProgress < 0.66 ? 2 : 3);
+      return `
+        <div class="flex items-center gap-4 select-none cursor-pointer" data-neko-wrapper="1">
+          <div class="relative w-[100px] h-10 flex items-center" data-neko-track="1">
+            <div class="absolute w-full h-[2px] bg-black top-1/2 -translate-y-1/2"></div>
+            <div data-neko-knob="1" class="absolute top-1/2 -translate-y-1/2 transition-transform duration-75 z-10" style="left:${neko.dragProgress * 100}%; transform: translate(-50%, -60%);">
+              <div class="w-10 h-10 transform -scale-x-100" data-neko-cat="1">${CatIcon(catValue)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderNotesView() {
+      const cols = state.layoutColumns === 1 ? "grid-cols-1" : state.layoutColumns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+      return `
+        <div class="animate-in fade-in">
+          <div class="flex justify-between items-center mb-16">
+            <div class="flex items-center gap-6">
+              <h2 class="text-6xl font-black uppercase italic">Archive</h2>
+              <button data-mailbox-open="1" class="hover:scale-110 transition-transform active:scale-95" aria-label="AI Mailbox" title="Ask AI to organize your notes">${MailboxIcon(44)}</button>
+            </div>
+            <div class="flex items-center gap-6">
+              <div class="hidden sm:block">${renderNekoSlider()}</div>
+              <button data-new-note="1" class="bg-black text-white px-8 py-3 font-bold flex items-center gap-2">+ NEW</button>
+            </div>
+          </div>
+          <div class="grid gap-8 ${cols}">
+            ${state.notes.length === 0 ? `<div class="col-span-full py-20 border-2 border-dashed border-black/10 text-center font-bold opacity-20">NO ARCHIVES FOUND</div>` : ""}
+            ${state.notes.map(note => `
+              <div data-open-note="${note.id}" class="border-2 border-black p-8 group cursor-pointer h-72 flex flex-col relative bg-white overflow-hidden shadow-none hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow">
+                <div class="flex justify-between mb-4 font-mono text-[10px] opacity-30 uppercase font-bold">
+                  <span>${escapeHtml(note.day || "")}</span>
+                  <button data-delete-note="${note.id}" class="hover:text-red-600" aria-label="delete">${Icon("Trash2", 14)}</button>
+                </div>
+                <h3 class="font-black text-xl mb-4 uppercase truncate">${escapeHtml(note.title || "")}</h3>
+                <p class="text-sm text-gray-500 flex-1 overflow-hidden" style="display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;">${escapeHtml(clampText(note.text || "", 360))}</p>
+                ${note.images?.length ? `<div class="absolute bottom-4 right-4 flex p-2" data-hover-images="${note.id}">${note.images.slice(0,3).map((img, i) => `<div class="w-8 h-8 border border-black bg-white -ml-4 shadow-sm overflow-hidden" style="transform: rotate(${i*5-5}deg)"><img src="${img.src}" class="w-full h-full object-cover grayscale" /></div>`).join("")}</div>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMailboxPopup() {
+      if (!state.mailboxOpen) return "";
+      const hasResult = !!state.mailboxResult;
+      return `
+        <div class="fixed inset-0 z-[200] flex items-center justify-center p-4" style="background:rgba(0,0,0,0.3)">
+          <div class="bg-white border-4 border-black w-full max-w-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 flex flex-col" style="max-height:85vh">
+            <div class="flex items-center justify-between px-6 py-4 border-b-2 border-black bg-gray-50 shrink-0">
+              <div class="flex items-center gap-3">
+                ${MailboxIcon(28)}
+                <span class="font-black text-sm uppercase tracking-widest">AI Mailbox</span>
+              </div>
+              <button data-mailbox-close="1" class="hover:rotate-90 transition-transform">${Icon("X", 20)}</button>
+            </div>
+            ${hasResult ? `
+              <div class="p-6 overflow-y-auto flex-1 no-scrollbar">
+                <p class="text-xs text-gray-400 font-bold uppercase mb-2">AI Reply</p>
+                <div class="border-2 border-black p-4 text-sm leading-relaxed whitespace-pre-wrap bg-gray-50 mb-4" style="max-height:50vh; overflow-y:auto">${escapeHtml(state.mailboxResult)}</div>
+                <div class="flex gap-3">
+                  <button data-mailbox-save="1" class="flex-1 bg-black text-white py-3 font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 hover:invert transition-all">
+                    ${Icon("Save", 16)} SAVE TO NOTES
+                  </button>
+                  <button data-mailbox-back="1" class="px-5 py-3 border-2 border-black font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all">
+                    BACK
+                  </button>
+                </div>
+              </div>
+            ` : `
+              <div class="p-6">
+                <p class="text-xs text-gray-500 mb-4 font-bold uppercase">Tell me what to do with your notes...</p>
+                <textarea data-mailbox-input="1" class="w-full border-2 border-black p-4 text-sm font-medium outline-none resize-none h-28 mb-4" placeholder="e.g. 帮我整理所有跟 token 有关的笔记&#10;e.g. 到底什么是 RAG？用简单的语言解释">${escapeHtml(state.mailboxPrompt)}</textarea>
+                <button data-mailbox-send="1" class="w-full bg-black text-white py-3 font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 ${state.mailboxLoading ? "opacity-60 pointer-events-none" : "hover:invert transition-all"}">
+                  ${state.mailboxLoading ? `<span class="animate-pulse">THINKING...</span>` : `${Icon("Zap", 16)} SEND`}
+                </button>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    async function callAI(prompt) {
+      const notesContext = state.notes.map(n => {
+        return `[${n.title || "Untitled"}] (${n.day || "no date"}):\n${n.text || "(empty)"}`;
+      }).join("\n\n---\n\n");
+
+      const systemPrompt = `You are a helpful study assistant for an AI learning sprint program. The user has the following study notes:\n\n${notesContext}\n\nBased on these notes, respond to the user's request. Write your response in the same language the user uses. Be concise, structured, and helpful. Use markdown-style headings and bullet points for clarity.`;
+
+      const url = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${ZHIPU_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "glm-4-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2048
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`ZhipuAI API error: ${response.status} ${err}`);
+      }
+
+      const data = await response.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error("Empty response from ZhipuAI");
+      return text;
+    }
+
+    async function handleMailboxSend() {
+      const prompt = (state.mailboxPrompt || "").trim();
+      if (!prompt) { showToast("Please enter a request"); return; }
+      if (state.mailboxLoading) return;
+
+      state.mailboxLoading = true;
+      updateMailboxUI();
+
+      try {
+        const result = await callAI(prompt);
+        state.mailboxLoading = false;
+        state.mailboxResult = result;
+        state.mailboxResultPrompt = prompt;
+        render();
+      } catch (e) {
+        console.error(e);
+        state.mailboxLoading = false;
+        updateMailboxUI();
+        showToast("AI request failed");
+      }
+    }
+
+    async function handleMailboxSave() {
+      const result = state.mailboxResult;
+      const prompt = state.mailboxResultPrompt;
+      if (!result) return;
+
+      const title = prompt.length > 40 ? prompt.slice(0, 40) + "…" : prompt;
+      const docId = `ai_${Date.now()}`;
+      const payload = {
+        text: result,
+        images: [],
+        taskId: null,
+        isCustom: true,
+        title: "AI: " + title,
+        updatedAt: state.firebaseEnabled ? serverTimestamp() : Date.now(),
+        day: new Date().toLocaleDateString()
+      };
+
+      if (state.firebaseEnabled && state.user && state.db) {
+        try {
+          await setDoc(doc(state.db, "artifacts", appId, "users", state.user.uid, "notes", docId), payload);
+        } catch (e) {
+          console.error(e);
+          const idx2 = state.notes.findIndex(n => n.id === docId);
+          const normalized = { id: docId, ...payload };
+          if (idx2 >= 0) state.notes.splice(idx2, 1, normalized);
+          else state.notes.unshift(normalized);
+          saveNotesToLocal();
+        }
+      } else {
+        const normalized = { id: docId, ...payload };
+        state.notes.unshift(normalized);
+        saveNotesToLocal();
+      }
+
+      state.mailboxOpen = false;
+      state.mailboxPrompt = "";
+      state.mailboxResult = "";
+      state.mailboxResultPrompt = "";
+      showToast("AI note saved!");
+      render();
+    }
+
+    function updateMailboxUI() {
+      const popup = document.querySelector("[data-mailbox-send='1']");
+      if (!popup) return;
+      popup.innerHTML = state.mailboxLoading
+        ? `<span class="animate-pulse">THINKING...</span>`
+        : `${Icon("Zap", 16)} SEND`;
+      if (state.mailboxLoading) {
+        popup.classList.add("opacity-60", "pointer-events-none");
+      } else {
+        popup.classList.remove("opacity-60", "pointer-events-none");
+      }
+    }
+
+    function renderSignalsView() {
+      return `
+        <div class="max-w-3xl mx-auto animate-in fade-in">
+          <header class="mb-12 border-b-4 border-black pb-4">
+            <h2 class="text-5xl font-black italic uppercase">Signals</h2>
+            <p class="font-mono text-xs text-gray-500 mt-2 uppercase">Real-time trends feed</p>
+          </header>
+          ${state.newsLoading ? `<div class="py-20 text-center font-mono animate-pulse">SCANNING...</div>` : `<div class="border-t-2 border-black">${state.newsData.map(item => `<div data-open-link="${escapeHtml(item.link)}" class="border-b-2 border-black py-8 group cursor-pointer hover:bg-gray-50 transition-colors"><div class="flex items-center gap-2 mb-3 text-[10px] font-bold"><span class="bg-black text-white px-2 py-0.5 uppercase">AI News</span><span class="opacity-30 uppercase">${escapeHtml(new Date(item.pubDate).toLocaleDateString())}</span></div><h3 class="text-2xl font-black uppercase group-hover:underline leading-tight">${escapeHtml(item.title || "")}</h3></div>`).join("")}</div>`}
+        </div>
+      `;
+    }
+
+    function renderHoveredImagesOverlay() {
+      if (!state.hoveredImages) return "";
+      return `<div class="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center p-10 bg-white/10 backdrop-blur-sm"><div class="bg-white border-4 border-black p-6 flex flex-row gap-4 animate-in zoom-in-95 shadow-2xl">${state.hoveredImages.map(img => `<img src="${img.src}" class="h-60 border-2 border-black" />`).join("")}</div></div>`;
+    }
+
+    function renderTaskModal() {
+      const t = state.selectedTask;
+      if (!t) return "";
+      const isCustom = !!t.isCustom;
+      const suggestedTime = t.time || "";
+      const micHTML = `
+        <div class="mic-wrap ${state.isListening ? "recording" : ""}" data-mic-wrap="1">
+          <div class="mic-ring"></div><div class="mic-ring"></div><div class="mic-ring"></div>
+          <div class="mic-flash" data-mic-flash="1"></div>
+          <button data-voice-toggle="1" class="mic-btn p-2 rounded-full border-2 ${state.isListening ? "border-red-500" : "border-black"}" aria-label="voice">${Icon(state.isListening ? "MicOff" : "Mic", 18)}</button>
+          ${state.isListening ? `<div class="mic-waves"><span></span><span></span><span></span><span></span><span></span></div>` : ""}
+        </div>`;
+      const left = isCustom ? "" : `
+        <div class="w-full md:w-1/3 border-b-2 md:border-b-0 md:border-r-2 border-black p-12 overflow-y-auto bg-gray-50">
+          <div class="mb-12">
+            <div class="text-[10px] font-black uppercase tracking-widest opacity-30 mb-2">Briefing</div>
+            <h2 class="text-4xl font-black uppercase mb-4 leading-tight">${escapeHtml(t.title || "")}</h2>
+            <p class="text-sm font-medium opacity-60 leading-relaxed">${escapeHtml(t.desc || "")}</p>
+          </div>
+          ${Array.isArray(t.guide) && t.guide.length ? `<div class="space-y-8 mb-12">${t.guide.map((g, i) => `<div class="flex gap-4"><div class="w-6 h-6 border-2 border-black flex-shrink-0 flex items-center justify-center font-mono text-[10px] font-black">${i+1}</div><div><div class="font-black text-sm uppercase mb-1">${escapeHtml(g.step || "")}</div><div class="text-xs opacity-50 leading-relaxed">${escapeHtml(g.detail || "")}</div></div></div>`).join("")}</div>` : ""}
+          ${Array.isArray(t.materials) && t.materials.length ? `<div><div class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">Materials</div><ul class="space-y-2">${t.materials.map(m => `<li data-material="${escapeHtml(m)}" class="flex items-center gap-2 text-xs font-bold hover:underline cursor-pointer text-black">${Icon("ExternalLink", 12)} ${escapeHtml(m)}</li>`).join("")}</ul></div>` : ""}
+        </div>
+      `;
+      const timer = isCustom ? "" : `<div class="hidden sm:block"><div class="flex items-center gap-4 bg-black text-white px-4 py-1 font-mono text-sm"><span class="opacity-50 text-[10px]">GOAL: ${escapeHtml(suggestedTime)}</span><span class="font-black" data-timer-value="1">${formatTime(state.timerSeconds)}</span><button data-timer-toggle="1" aria-label="toggle timer">${state.timerActive ? Icon("Pause", 14) : Icon("Play", 14)}</button></div></div>`;
+      return `
+        <div data-task-modal="1" class="fixed inset-0 bg-white z-[100] flex flex-col animate-in slide-in-from-bottom-10 overflow-hidden transition-opacity duration-200">
+          <div class="h-16 border-b-2 border-black flex items-center justify-between px-6 bg-white sticky top-0">
+            <button data-close-modal="1" class="hover:rotate-90 transition-transform" aria-label="close">${Icon("X", 24)}</button>
+            <div class="flex items-center gap-4">${timer}${micHTML}<button data-save-note="1" class="bg-black text-white px-10 py-2 font-black uppercase text-sm hover:invert transition-all">Save</button></div>
+          </div>
+          ${state.isListening ? `<div class="w-full bg-red-500 text-white text-center py-1.5 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 shrink-0"><span class="inline-flex items-center gap-[3px]"><span class="w-[3px] h-[10px] bg-white rounded-sm" style="animation:waveBar 0.8s ease-in-out 0s infinite"></span><span class="w-[3px] h-[10px] bg-white rounded-sm" style="animation:waveBar 0.8s ease-in-out 0.2s infinite"></span><span class="w-[3px] h-[10px] bg-white rounded-sm" style="animation:waveBar 0.8s ease-in-out 0.4s infinite"></span></span> Recording — tap mic to stop</div>` : ""}
+          <div class="flex-1 flex flex-col md:flex-row overflow-hidden">${left}
+            <div class="flex-1 overflow-y-auto p-12 relative bg-white">
+              <input data-note-title="1" value="${escapeHtml(t.title || "")}" class="text-4xl md:text-7xl font-black w-full outline-none uppercase mb-12 placeholder:opacity-10 leading-tight bg-transparent" placeholder="TITLE" />
+              <div class="relative min-h-[60vh]">
+                <textarea data-note-textarea="1" class="w-full h-full min-h-[60vh] text-xl font-medium outline-none resize-none leading-relaxed bg-transparent" placeholder="Capture signals...">${escapeHtml(state.noteText)}</textarea>
+                <div data-note-images-layer="1" class="absolute inset-0 z-10 pointer-events-none">${state.noteImages.map(img => `
+                  <div data-img-id="${img.id}" class="absolute border-2 border-black bg-white group cursor-move shadow-xl pointer-events-auto" style="left:${img.x}px; top:${img.y}px; width:${img.width || 300}px;">
+                    <div data-img-move="${img.id}"><img src="${img.src}" class="w-full pointer-events-none" /></div>
+                    <div data-img-resize="${img.id}" class="absolute bottom-0 right-0 w-6 h-6 bg-black cursor-nwse-resize flex items-center justify-center opacity-0 group-hover:opacity-100"><div class="w-1 h-1 bg-white"></div></div>
+                    <button data-img-remove="${img.id}" class="absolute -top-3 -right-3 bg-black text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-none" aria-label="remove image">${Icon("X", 12)}</button>
+                  </div>
+                `).join("")}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderErrorScreen() {
+      return `<div class="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-white">${Icon("AlertCircle", 48, "mb-4 text-black")}<h2 class="text-2xl font-black uppercase mb-4 text-red-600">应用异常</h2><p class="text-sm opacity-60 mb-8">请刷新页面重试</p><button data-reload="1" class="bg-black text-white px-8 py-3 font-bold">重新加载</button></div>`;
+    }
+
+    function renderAppShell() {
+      return `
+        <div class="min-h-screen bg-white text-black relative">
+          ${renderNav()}
+          <main class="max-w-7xl mx-auto px-6 py-12">
+            ${state.currentView === "sprint" ? renderSprintView() : ""}
+            ${state.currentView === "notes" ? renderNotesView() : ""}
+            ${state.currentView === "signals" ? renderSignalsView() : ""}
+          </main>
+          ${renderHoveredImagesOverlay()}
+          ${renderTaskModal()}
+          ${renderMailboxPopup()}
+        </div>
+      `;
+    }
+
+    function render() {
+      try {
+        if (!state.user) {
+          const existingLogin = root.querySelector("[data-login-email='1']");
+          if (existingLogin) {
+            existingLogin.value = state.loginEmail || "";
+            const pwd = root.querySelector("[data-login-password='1']");
+            if (pwd) pwd.value = state.loginPassword || "";
+            bindEvents();
+            return;
+          }
+          root.innerHTML = renderLogin();
+        } else {
+          if (state.modalClosing) return;
+          if (root.querySelector("[data-task-modal='1']")) return;
+          root.innerHTML = renderAppShell();
+        }
+        bindEvents();
+      } catch (e) {
+        console.error("Render error", e);
+        root.innerHTML = renderErrorScreen();
+        root.querySelector("[data-reload='1']")?.addEventListener("click", () => location.reload());
+      }
+    }
+
+    function doLogin() {
+      const email = (state.loginEmail || "").trim();
+      const pwd = state.loginPassword || "";
+      if (!email || !email.includes("@")) { showToast("Invalid email"); return; }
+      if (!pwd || pwd.length < 6) { showToast("Password >= 6 chars"); return; }
+      loginWithEmailPassword(email, pwd);
+    }
+
+    function bindEvents() {
+      const emailInput = root.querySelector("[data-login-email='1']");
+      const pwdInput = root.querySelector("[data-login-password='1']");
+      const loginBtn = root.querySelector("[data-login-btn='1']");
+      if (emailInput) { emailInput.addEventListener("input", e => { state.loginEmail = e.target.value || ""; }); emailInput.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); }); }
+      if (pwdInput) { pwdInput.addEventListener("input", e => { state.loginPassword = e.target.value || ""; }); pwdInput.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); }); }
+      if (loginBtn) loginBtn.addEventListener("click", doLogin);
+
+      root.querySelectorAll("[data-nav]").forEach(btn => { btn.addEventListener("click", () => { state.currentView = btn.getAttribute("data-nav"); render(); fetchNewsIfNeeded(); }); });
+      root.querySelector("[data-logout='1']")?.addEventListener("click", doLogout);
+      root.querySelectorAll("[data-open-task]").forEach(el => { el.addEventListener("click", () => { const task = findTaskById(el.getAttribute("data-open-task")); if (task) openTask(task); }); });
+      root.querySelector("[data-new-note='1']")?.addEventListener("click", () => { openTask({ title: "New Note", isCustom: true, id: `custom_${Date.now()}` }); });
+      root.querySelectorAll("[data-open-note]").forEach(el => {
+        el.addEventListener("click", () => {
+          const note = state.notes.find(n => n.id === el.getAttribute("data-open-note"));
+          if (!note) return;
+          openTask({ id: note.id, taskId: note.taskId || null, isCustom: !!note.isCustom, title: note.title || "Note", desc: "", guide: null, materials: null, time: "" });
+        });
+      });
+      root.querySelectorAll("[data-delete-note]").forEach(btn => { btn.addEventListener("click", (e) => { e.stopPropagation(); deleteNote(btn.getAttribute("data-delete-note")); }); });
+      root.querySelectorAll("[data-hover-images]").forEach(el => {
+        const note = state.notes.find(n => n.id === el.getAttribute("data-hover-images"));
+        if (!note || !note.images?.length) return;
+        el.addEventListener("mouseenter", () => { state.hoveredImages = note.images; render(); });
+        el.addEventListener("mouseleave", () => { state.hoveredImages = null; render(); });
+      });
+      root.querySelectorAll("[data-open-link]").forEach(el => { el.addEventListener("click", () => { const link = el.getAttribute("data-open-link"); if (link) window.open(link, "_blank", "noopener,noreferrer"); }); });
+      root.querySelector("[data-close-modal='1']")?.addEventListener("click", closeTask);
+
+      // Mailbox events
+      root.querySelector("[data-mailbox-open='1']")?.addEventListener("click", () => {
+        state.mailboxOpen = true;
+        state.mailboxPrompt = "";
+        state.mailboxLoading = false;
+        state.mailboxResult = "";
+        state.mailboxResultPrompt = "";
+        render();
+        const input = root.querySelector("[data-mailbox-input='1']");
+        if (input) input.focus();
+      });
+      root.querySelector("[data-mailbox-close='1']")?.addEventListener("click", () => {
+        state.mailboxOpen = false;
+        state.mailboxPrompt = "";
+        state.mailboxLoading = false;
+        state.mailboxResult = "";
+        state.mailboxResultPrompt = "";
+        render();
+      });
+      root.querySelector("[data-mailbox-input='1']")?.addEventListener("input", e => {
+        state.mailboxPrompt = e.target.value || "";
+      });
+      root.querySelector("[data-mailbox-input='1']")?.addEventListener("keydown", e => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMailboxSend(); }
+      });
+      root.querySelector("[data-mailbox-send='1']")?.addEventListener("click", handleMailboxSend);
+      root.querySelector("[data-mailbox-save='1']")?.addEventListener("click", handleMailboxSave);
+      root.querySelector("[data-mailbox-back='1']")?.addEventListener("click", () => {
+        state.mailboxResult = "";
+        state.mailboxResultPrompt = "";
+        render();
+        setTimeout(() => { const input = root.querySelector("[data-mailbox-input='1']"); if (input) input.focus(); }, 50);
+      });
+      root.querySelector("[data-save-note='1']")?.addEventListener("click", saveNote);
+      root.querySelector("[data-voice-toggle='1']")?.addEventListener("click", () => {
+        const flash = document.querySelector("[data-mic-flash='1']");
+        if (flash) { flash.classList.remove("active"); void flash.offsetWidth; flash.classList.add("active"); }
+        toggleVoice();
+      });
+      root.querySelector("[data-timer-toggle='1']")?.addEventListener("click", toggleTimer);
+      root.querySelectorAll("[data-material]").forEach(el => { el.addEventListener("click", () => { window.open(`https://www.google.com/search?q=${encodeURIComponent(el.getAttribute("data-material") || "")}`, "_blank", "noopener,noreferrer"); }); });
+      const titleInput = root.querySelector("[data-note-title='1']");
+      if (titleInput) titleInput.addEventListener("input", e => { if (state.selectedTask) state.selectedTask.title = e.target.value || ""; });
+      const ta = root.querySelector("[data-note-textarea='1']");
+      if (ta) { ta.addEventListener("input", e => { state.noteText = e.target.value || ""; }); ta.addEventListener("paste", handlePasteImages); }
+      root.querySelectorAll("[data-img-move]").forEach(el => {
+        el.addEventListener("mousedown", e => { const img = state.noteImages.find(i => i.id === Number(el.getAttribute("data-img-move"))); if (img) startImageControl(e, img, "move"); });
+        el.addEventListener("touchstart", e => { const img = state.noteImages.find(i => i.id === Number(el.getAttribute("data-img-move"))); if (img) startImageControl(e, img, "move"); }, { passive: false });
+      });
+      root.querySelectorAll("[data-img-resize]").forEach(el => {
+        el.addEventListener("mousedown", e => { const img = state.noteImages.find(i => i.id === Number(el.getAttribute("data-img-resize"))); if (img) startImageControl(e, img, "resize"); });
+        el.addEventListener("touchstart", e => { const img = state.noteImages.find(i => i.id === Number(el.getAttribute("data-img-resize"))); if (img) startImageControl(e, img, "resize"); }, { passive: false });
+      });
+      root.querySelectorAll("[data-img-remove]").forEach(btn => {
+        btn.addEventListener("click", e => {
+          e.stopPropagation();
+          const imgId = Number(btn.getAttribute("data-img-remove"));
+          state.noteImages = state.noteImages.filter(i => i.id !== imgId);
+          const layer = root.querySelector("[data-note-images-layer='1']");
+          const el = layer && layer.querySelector(`[data-img-id="${imgId}"]`);
+          if (el) el.remove();
+        });
+      });
+      const track = root.querySelector("[data-neko-track='1']");
+      const wrapper = root.querySelector("[data-neko-wrapper='1']");
+      if (track && wrapper) {
+        const onMove = e => { if (!neko.isDragging) return; updateNekoProgressFromX(typeof e.clientX === "number" ? e.clientX : (e.touches?.[0]?.clientX || 0), track); };
+        wrapper.addEventListener("mousemove", onMove);
+        wrapper.addEventListener("mouseup", endNekoDrag);
+        wrapper.addEventListener("mouseleave", endNekoDrag);
+        wrapper.addEventListener("touchmove", onMove, { passive: false });
+        wrapper.addEventListener("touchend", endNekoDrag);
+        track.addEventListener("mousedown", e => { neko.isDragging = true; updateNekoProgressFromX(e.clientX, track); });
+        track.addEventListener("touchstart", e => { neko.isDragging = true; updateNekoProgressFromX(e.touches[0].clientX, track); }, { passive: false });
+      }
+      window.onmousemove = e => globalMove(e);
+      window.onmouseup = () => endGlobalDrag();
+      window.ontouchmove = e => globalMove(e);
+      window.ontouchend = () => endGlobalDrag();
+    }
+
+    (function () {
+      const savedCols = Number(localStorage.getItem("lin_sprint_layout_cols") || "2");
+      state.layoutColumns = [1, 2, 3].includes(savedCols) ? savedCols : 2;
+    })();
+
+    render();
+    initFirebase();
+    if (state.currentView === "signals") fetchNewsIfNeeded();
+  </script>
+</body>
+</html>
