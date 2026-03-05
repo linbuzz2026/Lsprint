@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lsprint Screenshot Extract</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100vh; min-width: 100vw; font-family: 'Inter', sans-serif; background: #ffffff !important; color: #000000 !important; }
+    #root { min-height: 100vh; min-width: 100%; background: #ffffff; }
+    .pixel-art { image-rendering: pixelated; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const ICON_PATHS = {
+      X: `<path d="M18 6 6 18M6 6l12 12" />`,
+      Trash2: `<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />`,
+      Zap: `<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />`,
+      LogOut: `<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />`,
+      Brain: `<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" /><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />`,
+      Code: `<path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />`,
+      Coffee: `<path d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" /><path d="M6 1v3M10 1v3M14 1v3" />`,
+      Target: `<circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />`
+    };
+    function Icon(name, size = 24, cls = "") {
+      const c = ICON_PATHS[name]; if (!c) return "";
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${cls}">${c}</svg>`;
+    }
+    function MailboxIcon(size = 40) {
+      return `<svg viewBox="0 0 32 32" width="${size}" height="${size}" class="pixel-art" style="image-rendering:pixelated"><rect x="4" y="12" width="24" height="14" fill="#000" stroke="#000"/><rect x="6" y="14" width="10" height="10" fill="#000"/><rect x="16" y="14" width="10" height="10" fill="#000"/><rect x="20" y="8" width="2" height="12" fill="#CC3333"/><rect x="20" y="6" width="6" height="4" fill="#CC3333"/><rect x="10" y="26" width="12" height="4" fill="#000"/></svg>`;
+    }
+    function CatIcon(v) {
+      const Loaf = () => `<svg viewBox="0 0 32 32" fill="currentColor" class="w-full h-full text-black"><rect x="6" y="16" width="20" height="10"/><rect x="8" y="12" width="4" height="4"/><rect x="20" y="12" width="4" height="4"/></svg>`;
+      return Loaf();
+    }
+    const SPRINT_DATA = [
+      { week: 1, theme: "MECHANISM & BOUNDARIES", days: [
+        { id: 'w1d1', day: 'SESSION 01', title: "AI Principles", desc: "Probability & Tokens.", mini_task: "Hallucination Test" },
+        { id: 'w1d2', day: 'SESSION 02', title: "Vibe Coding", desc: "Controlling Chaos.", mini_task: "v0.dev Variations" },
+        { id: 'w1d3', day: 'SESSION 03', title: "Trust Design", desc: "UX for Errors.", mini_task: "Disclaimer Gallery" },
+        { id: 'w1d4', day: 'WEEKEND', title: "Honest Component", desc: "Regenerate UI.", mini_task: "Component Demo" }
+      ]},
+      { week: 2, theme: "CONTEXT & MEMORY", days: [
+        { id: 'w2d1', day: 'SESSION 01', title: "Context Window", desc: "RAG Logic.", mini_task: "RAG Storyboard" },
+        { id: 'w2d2', day: 'SESSION 02', title: "Agent Patterns", desc: "Chain of Thought.", mini_task: "Prompt Breakdown" },
+        { id: 'w2d3', day: 'SESSION 03', title: "Streaming UX", desc: "Perceived Latency.", mini_task: "Loading Screen" },
+        { id: 'w2d4', day: 'WEEKEND', title: "Persistence", desc: "LocalStorage.", mini_task: "Todo App" }
+      ]}
+    ];
+    const sampleNotes = [
+      { id: '1', day: '2025/3/1', title: 'Tokenization Notes', text: 'Tokens are the basic units that LLMs process. Understanding tokenization helps predict model behavior and manage context limits.' },
+      { id: '2', day: '2025/3/2', title: 'RAG Architecture', text: 'Retrieval Augmented Generation separates retrieval from generation. The retrieval step fetches relevant documents before the LLM generates a response.' }
+    ];
+    const sampleNews = [
+      { title: 'GPT-5 Rumors: What We Know So Far', pubDate: '2025-03-02', link: '#' },
+      { title: 'Claude 4 Release Brings New Capabilities', pubDate: '2025-03-01', link: '#' },
+      { title: 'Open Source LLMs Reach Parity in Benchmarks', pubDate: '2025-02-28', link: '#' }
+    ];
+    const neko = { dragProgress: 0.5 };
+    const layoutColumns = 2;
+    const cols = "grid-cols-1 md:grid-cols-2";
+
+    function renderNav(active) {
+      return `<nav class="border-b-2 border-black sticky top-0 bg-white z-40 h-14 flex items-center justify-between px-6">
+        <div class="flex gap-8">${['sprint','notes','signals'].map(v=>`<button class="text-[10px] font-black uppercase tracking-widest ${v===active?'opacity-100':'opacity-30'}">${v}</button>`).join('')}</div>
+        <div class="flex items-center gap-4"><button aria-label="logout">${Icon("LogOut", 16)}</button></div>
+      </nav>`;
+    }
+    function renderLogin() {
+      return `<div class="min-h-screen flex items-center justify-center bg-white p-4">
+        <div class="w-full max-w-sm border-2 border-black p-8 text-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <h1 class="text-4xl font-black mb-8 tracking-tighter uppercase">Lin's Sprint</h1>
+          <input type="email" placeholder="EMAIL" class="w-full border-b border-black text-center font-bold text-sm py-2 mb-3 outline-none bg-transparent" />
+          <input type="password" placeholder="PASSWORD (>= 6 chars)" class="w-full border-b border-black text-center font-bold text-sm py-2 mb-6 outline-none bg-transparent" />
+          <button class="w-full bg-black text-white py-3 font-bold uppercase tracking-widest">START</button>
+          <p class="mt-4 text-[10px] text-gray-500 uppercase">SAME EMAIL = SAME SPRINT ACROSS DEVICES</p>
+        </div>
+      </div>`;
+    }
+    function renderSprintView() {
+      return `<div class="animate-in fade-in">
+        <h1 class="text-[60px] md:text-[120px] font-black leading-none tracking-tighter mb-20 uppercase">Lin's Sprint</h1>
+        <div class="flex gap-6 font-mono text-[10px] font-bold uppercase text-gray-500 mb-12">
+          <span class="flex items-center gap-1">${Icon("Brain", 14)} Theory</span>
+          <span class="flex items-center gap-1">${Icon("Code", 14)} Practice</span>
+          <span class="flex items-center gap-1">${Icon("Coffee", 14)} Rest</span>
+        </div>
+        ${SPRINT_DATA.map(week => `<section class="mb-24">
+          <div class="flex justify-between items-baseline border-b-2 border-black pb-2 mb-8">
+            <h2 class="text-5xl font-black uppercase">Week ${week.week}</h2>
+            <span class="font-mono text-xs opacity-40">// ${week.theme}</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 border-t-2 border-l-2 border-black bg-black gap-px overflow-hidden">
+            ${week.days.map(task => `<div class="p-8 bg-white hover:bg-black hover:text-white cursor-pointer transition-colors group">
+              <div class="flex justify-between mb-8">
+                <div class="border border-black px-2 py-0.5 font-mono text-[10px] font-bold uppercase group-hover:border-white">${task.day}</div>
+              </div>
+              <h3 class="text-3xl font-black mb-4 uppercase leading-tight">${task.title}</h3>
+              <p class="text-sm opacity-60 mb-6">${task.desc}</p>
+              <div class="pt-4 border-t border-current flex items-center gap-2 font-mono text-[10px] font-bold opacity-40 uppercase">${Icon("Target", 12)} ${task.mini_task}</div>
+            </div>`).join('')}
+          </div>
+        </section>`).join('')}
+      </div>`;
+    }
+    function renderNekoSlider() {
+      return `<div class="flex items-center gap-4 select-none cursor-pointer">
+        <div class="relative w-[100px] h-10 flex items-center">
+          <div class="absolute w-full h-[2px] bg-black top-1/2 -translate-y-1/2"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 z-10" style="left:${neko.dragProgress*100}%;transform:translate(-50%,-60%)">
+            <div class="w-10 h-10 transform -scale-x-100">${CatIcon(1)}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+    function renderNotesView() {
+      return `<div class="animate-in fade-in">
+        <div class="flex justify-between items-center mb-16">
+          <div class="flex items-center gap-6">
+            <h2 class="text-6xl font-black uppercase italic">Archive</h2>
+            <button class="hover:scale-110 transition-transform" aria-label="AI Mailbox">${MailboxIcon(44)}</button>
+          </div>
+          <div class="flex items-center gap-6">
+            <div class="hidden sm:block">${renderNekoSlider()}</div>
+            <button class="bg-black text-white px-8 py-3 font-bold flex items-center gap-2">+ NEW</button>
+          </div>
+        </div>
+        <div class="grid gap-8 ${cols}">
+          ${sampleNotes.map(n => `<div class="border-2 border-black p-8 group cursor-pointer h-72 flex flex-col relative bg-white overflow-hidden shadow-none hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow">
+            <div class="flex justify-between mb-4 font-mono text-[10px] opacity-30 uppercase font-bold">
+              <span>${n.day}</span>
+              <button aria-label="delete">${Icon("Trash2", 14)}</button>
+            </div>
+            <h3 class="font-black text-xl mb-4 uppercase truncate">${n.title}</h3>
+            <p class="text-sm text-gray-500 flex-1 overflow-hidden" style="display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;">${n.text}</p>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+    function renderSignalsView() {
+      return `<div class="max-w-3xl mx-auto animate-in fade-in">
+        <header class="mb-12 border-b-4 border-black pb-4">
+          <h2 class="text-5xl font-black italic uppercase">Signals</h2>
+          <p class="font-mono text-xs text-gray-500 mt-2 uppercase">Real-time trends feed</p>
+        </header>
+        <div class="border-t-2 border-black">
+          ${sampleNews.map(item => `<div class="border-b-2 border-black py-8 group cursor-pointer hover:bg-gray-50 transition-colors">
+            <div class="flex items-center gap-2 mb-3 text-[10px] font-bold">
+              <span class="bg-black text-white px-2 py-0.5 uppercase">AI News</span>
+              <span class="opacity-30 uppercase">${new Date(item.pubDate).toLocaleDateString()}</span>
+            </div>
+            <h3 class="text-2xl font-black uppercase group-hover:underline leading-tight">${item.title}</h3>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const page = params.get('page') || 'login';
+    const root = document.getElementById('root');
+
+    if (page === 'login') {
+      root.innerHTML = renderLogin();
+    } else {
+      const main = page === 'sprint' ? renderSprintView() : page === 'notes' ? renderNotesView() : renderSignalsView();
+      root.innerHTML = `<div class="min-h-screen bg-white text-black">
+        ${renderNav(page)}
+        <main class="max-w-7xl mx-auto px-6 py-12">${main}</main>
+      </div>`;
+    }
+  </script>
+</body>
+</html>
