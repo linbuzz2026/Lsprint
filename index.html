@@ -203,6 +203,7 @@
 
     const root = document.getElementById("root");
     const appId = "lin-sprint-default";
+    const VERSION = "1.0.0";
 
     const state = {
       user: null,
@@ -724,6 +725,7 @@
             <input data-login-password="1" type="password" autocomplete="current-password" name="password" value="${escapeHtml(state.loginPassword)}" placeholder="PASSWORD (>= 6 chars)" class="w-full border-b border-black text-center font-bold text-sm py-2 mb-6 outline-none bg-transparent" />
             <button data-login-btn="1" class="w-full bg-black text-white py-3 font-bold uppercase tracking-widest">START</button>
             <p class="mt-4 text-[10px] text-gray-500 uppercase">SAME EMAIL = SAME SPRINT ACROSS DEVICES</p>
+            <p class="mt-2 text-[9px] text-gray-400">v${VERSION}</p>
           </div>
         </div>
       `;
@@ -733,8 +735,9 @@
       const tabs = ["sprint", "notes", "signals"];
       return `
         <nav class="border-b-2 border-black sticky top-0 bg-white z-40 h-14 flex items-center justify-between px-6">
-          <div class="flex gap-8">
+          <div class="flex gap-8 items-center">
             ${tabs.map(v => `<button data-nav="${v}" class="text-[10px] font-black uppercase tracking-widest ${state.currentView === v ? "opacity-100" : "opacity-30"}">${v}</button>`).join("")}
+            <span class="text-[9px] text-gray-400 font-mono">v${VERSION}</span>
           </div>
           <div class="flex items-center gap-4">
             <button data-logout="1" aria-label="logout">${Icon("LogOut", 16)}</button>
